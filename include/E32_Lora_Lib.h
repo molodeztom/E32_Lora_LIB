@@ -42,6 +42,35 @@
     int uart_port;
 } e32_pins_t;
 
+
+#pragma pack(push, 1) // no padding between struct members
+typedef struct
+{
+    uint8_t airDataRate : 3;  // bit 0-2
+    uint8_t uartBaudRate : 3; // bit 3-5
+    uint8_t uartParity : 2;   // bit 6-7
+} e32_speed_t;
+
+typedef struct
+{
+    uint8_t transmissionPower : 2;  // bit 0-1
+    uint8_t fec : 1;                // bit 2
+    uint8_t wirelessWakeupTime : 3; // bit 3-5
+    uint8_t ioDriveMode : 1;        // bit 6
+    uint8_t fixedTransmission : 1;  // bit 7
+} e32_option_t;
+
+typedef struct 
+{
+    uint8_t HEAD;
+    uint8_t ADDH;
+    uint8_t ADDL;
+    e32_speed_t SPED;
+    uint8_t CHAN;
+    e32_option_t OPTION;
+} e32_config_t;
+#pragma pack(pop)
+
 // Set pins before calling init
 void e32_set_pins(const e32_pins_t *pins);
 
@@ -49,4 +78,5 @@ void func(void);
 void wait_for_aux();
 void set_mode(enum MODE mode);
 esp_err_t e32_send_data(const uint8_t *data, size_t len);
+void sendConfiguration(e32_config_t *config);
 

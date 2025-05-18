@@ -57,3 +57,19 @@ esp_err_t e32_send_data(const uint8_t *data, size_t len)
     ESP_LOGI(TAG, "%d Bytes send", len);
     return (bytes_written == len) ? ESP_OK : ESP_FAIL;
 }
+
+void sendConfiguration(e32_config_t *e32_config)
+{
+    ESP_LOGI(TAG, "Send configuration to E32 module");
+
+    set_mode(MODE_SLEEP_PROG);                 // Set to programming mode (M0=1, M1=1)
+    vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
+
+    ESP_LOGI(TAG, "Send configuration command to E32 module");
+
+    ESP_ERROR_CHECK(e32_send_data((uint8_t *)e32_config, sizeof(e32_config_t)));
+    vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
+    wait_for_aux();                // Wait for AUX to be HIGH
+    set_mode(MODE_NORMAL);                // Set back to normal mode (M0=0, M1=0)
+    ESP_LOGI(TAG, "Configuration command sent to E32 module");
+}
