@@ -18,6 +18,8 @@
 
   */
 
+  #pragma once
+
   
   #define WAIT_FOR_PROCESSING_LIB 200 // ms This is the time required for the module to process commands.
 // UART configuration
