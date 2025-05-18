@@ -24,6 +24,9 @@
 #define E32_UART_PORT UART_NUM_1
 #define BUF_SIZE 1024
 
+#define CONFIG_CMD_LEN 6
+#define RESPONSE_LEN 6
+
   // e32 working modes
   enum MODE
 {
@@ -71,8 +74,81 @@ typedef struct
 } e32_config_t;
 #pragma pack(pop)
 
+
+enum E32_UART_PARITY
+{
+    E32_UART_PARITY_8N1 = 0b00,
+    E32_UART_PARITY_8O1 = 0b01,
+    E32_UART_PARITY_8E1 = 0b10
+};
+
+enum E32_UART_BAUD_RATE
+{
+    E32_UART_BAUD_RATE_1200 = 0b000,
+    E32_UART_BAUD_RATE_2400 = 0b001,
+    E32_UART_BAUD_RATE_4800 = 0b010,
+    E32_UART_BAUD_RATE_9600 = 0b011,
+    E32_UART_BAUD_RATE_19200 = 0b100,
+    E32_UART_BAUD_RATE_38400 = 0b101,
+    E32_UART_BAUD_RATE_57600 = 0b110,
+    E32_UART_BAUD_RATE_115200 = 0b111
+};
+
+enum AIR_DATA_RATE
+{
+    AIR_DATA_RATE_300 = 0b000,
+    AIR_DATA_RATE_1200 = 0b001,
+    AIR_DATA_RATE_2400 = 0b010,
+    AIR_DATA_RATE_4800 = 0b011,
+    AIR_DATA_RATE_9600 = 0b100,
+    AIR_DATA_RATE_19200 = 0b101
+};
+
+enum TRANSMISSION
+{
+    TRANSMISSION_TRANSPARENT = 0b0,
+    TRANSMISSION_FIXED = 0b1
+};
+
+enum IO_DRIVE_MODE
+{
+    IO_DRIVE_MODE_PUSH_PULL = 0b0,
+    IO_DRIVE_MODE_OPEN_DRAIN = 0b1
+};
+
+enum WIRELESS_WAKEUP_TIME
+{
+    WIRELESS_WAKEUP_TIME_250MS = 0b000,
+    WIRELESS_WAKEUP_TIME_500MS = 0b001,
+    WIRELESS_WAKEUP_TIME_750MS = 0b010,
+    WIRELESS_WAKEUP_TIME_1000MS = 0b011,
+    WIRELESS_WAKEUP_TIME_1250MS = 0b100,
+    WIRELESS_WAKEUP_TIME_1500MS = 0b101,
+    WIRELESS_WAKEUP_TIME_1750MS = 0b110,
+    WIRELESS_WAKEUP_TIME_2000MS = 0b111
+};
+
+enum FEC
+{
+    FEC_DISABLE = 0b0,
+    FEC_ENABLE = 0b1
+};
+
+enum TRANSMISSION_POWER
+{
+    TRANSMISSION_POWER_30dBm = 0b00,
+    TRANSMISSION_POWER_27dBm = 0b01,
+    TRANSMISSION_POWER_24dBm = 0b10,
+    TRANSMISSION_POWER_21dBm = 0b11
+};
+
+
+
+
+
 // Set pins before calling init
 void init_io(void);
+void e32_init_config(e32_config_t *config);
 void e32_set_pins(const e32_pins_t *pins);
 void func(void);
 void wait_for_aux();
@@ -82,8 +158,6 @@ void sendConfiguration(e32_config_t *config);
 void get_config(void);
 void decode_config(uint8_t *e32_data, int e32_data_len);
 esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_len);
-void get_config(void);
-void decode_config(uint8_t *data, int len);
 bool e32_data_available();
 
 

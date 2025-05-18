@@ -1,3 +1,22 @@
+/**************************************************************************
+ E32-900T30D LoRa Lib
+
+
+  Hardware:
+  ESP32-S3-DevKitC-1 mit Wroom N16R8
+  LoRa E32-900T30D connected M0 M1 and Rx Tx
+
+  Try sending a message to remote LoRa
+
+  Project settings:
+  ESP-IDF config editor:
+  -> LORA debug settings: y for extended output
+
+  History: master if not shown otherwise
+  20250518:V0.1: initial version
+
+  */
+
 #include <stdio.h>
 //#include <string.h>
 #include "freertos/FreeRTOS.h"
@@ -10,6 +29,14 @@
 static const char *TAG = "LORA_LIB";
 
 // Default-Pins
+
+// Pin configuration
+/* #define E32_M0_GPIO 10
+#define E32_M1_GPIO 11
+#define E32_AUX_GPIO 14
+#define E32_TXD_GPIO 12 // TXD Pin on ESP32
+#define E32_RXD_GPIO 13 // RXD Pin on ESP32 */
+
 static e32_pins_t e32_pins = {
     .gpio_m0 = 10,
     .gpio_m1 = 11,
@@ -58,6 +85,7 @@ esp_err_t e32_send_data(const uint8_t *data, size_t len)
     return (bytes_written == len) ? ESP_OK : ESP_FAIL;
 }
 
+
 esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_len)
 {
     if (buffer == NULL || received_len == NULL) {
@@ -81,6 +109,73 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
         return ESP_ERR_TIMEOUT;  // no data received within timeout
     }
 }
+
+bool e32_data_available() {
+    // Check if there is data available in the UART buffer
+    size_t length = 0;
+    if (uart_get_buffered_data_len(E32_UART_PORT, &length) == ESP_OK) {
+        return length > 0;
+    }
+    return false;
+}
+
+void e32_init_config(e32_config_t *config)
+{
+    config->HEAD = 0xC0; // This is the command to save parameters to non-volatile memory.
+    config->ADDH = 0x00;
+    config->ADDL = 0x00;
+    config->SPED.uartParity = E32_UART_PARITY_8N1;
+    config->SPED.uartBaudRate = E32_UART_BAUD_RATE_9600;
+    config->SPED.airDataRate = AIR_DATA_RATE_2400;
+    config->CHAN = 0x06; // Kanal 7 (902.875MHz)
+    // Add explanation for 0x06: This corresponds to channel 7 in the frequency range.
+    config->OPTION.fixedTransmission = TRANSMISSION_TRANSPARENT; // Transparent mode
+    config->OPTION.ioDriveMode = IO_DRIVE_MODE_PUSH_PULL;
+    config->OPTION.wirelessWakeupTime = WIRELESS_WAKEUP_TIME_250MS;
+    config->OPTION.fec = FEC_ENABLE;
+    config->OPTION.transmissionPower = TRANSMISSION_POWER_30dBm; // 30dBm
+}
+
+
+void init_io()
+{
+    ESP_LOGI(TAG, "Initialisiere IO-Pins");
+    // configure command pins M0 and M1
+    gpio_config_t mode_conf = {
+        .intr_type = GPIO_INTR_DISABLE,                                // no interrupt
+        .mode = GPIO_MODE_OUTPUT,                                      // set as output mode
+        .pin_bit_mask = (1ULL << e32_pins.gpio_m0) | (1ULL << e32_pins.gpio_m1), // bit mask of the pins, use a bit for each pin
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,                         // disable pull-down mode
+        .pull_up_en = GPIO_PULLUP_DISABLE                              // disable pull-up mode
+    };
+    gpio_config(&mode_conf);
+    // configure AUX pin
+    gpio_config_t aux_conf = {
+        .intr_type = GPIO_INTR_DISABLE,         // no interrupt
+        .mode = GPIO_MODE_INPUT,                // set as input mode
+        .pin_bit_mask = (1ULL << e32_pins.gpio_aux), // bit mask of the pins, use a bit for each pin
+        .pull_down_en = GPIO_PULLDOWN_DISABLE,  // disable pull-down mode
+        .pull_up_en = GPIO_PULLUP_DISABLE       // disable pull-up mode
+    };
+    gpio_config(&aux_conf);
+
+    // configure UART with the given settings
+    uart_config_t uart_config = {
+        .baud_rate = 9600,                     // baud rate
+        .data_bits = UART_DATA_8_BITS,         // data bits
+        .parity = UART_PARITY_DISABLE,         // no parity
+        .stop_bits = UART_STOP_BITS_1,         // stop bits
+        .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // no flow control
+    };
+    uart_driver_install(E32_UART_PORT, BUF_SIZE * 2, 0, 0, NULL, 0);                                 // install UART driver
+    uart_param_config(E32_UART_PORT, &uart_config);                                                  // configure UART parameters
+    uart_set_pin(E32_UART_PORT, e32_pins.gpio_txd, e32_pins.gpio_rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); // set UART pins
+/* #if CONFIG_DEBUG_LORA
+    gpio_dump_io_configuration(stdout, (1ULL << 10) | (1ULL << 11) | (1ULL << 12) | (1ULL << 13) | (1ULL << 14));
+    ESP_LOGI(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d", E32_M0_GPIO, E32_M1_GPIO, E32_TXD_GPIO, E32_RXD_GPIO, E32_AUX_GPIO);
+#endif */
+}
+
 
 void sendConfiguration(e32_config_t *e32_config)
 {
