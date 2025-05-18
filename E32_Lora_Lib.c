@@ -1,6 +1,6 @@
 #include <stdio.h>
 //#include <string.h>
-//#include "freertos/FreeRTOS.h"
+#include "freertos/FreeRTOS.h"
 //#include "freertos/task.h"
 #include "E32_Lora_Lib.h"
 #include "driver/gpio.h"
@@ -39,6 +39,21 @@ void wait_for_aux()
     ESP_LOGI(TAG, "Wait for AUX to be HIGH");
     while (!gpio_get_level(e32_pins.gpio_aux))
     {
-      // vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB));
+      vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB));
     }
 } 
+void set_mode(enum MODE mode)
+{
+    gpio_set_level(e32_pins.gpio_m0, (mode & 0b01));
+    gpio_set_level(e32_pins.gpio_m1, ((mode & 0b10) >> 1));
+    vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB));
+    wait_for_aux();
+}
+
+// send data to E32 module
+esp_err_t e32_send_data(const uint8_t *data, size_t len)
+{
+    int bytes_written = uart_write_bytes(E32_UART_PORT, (const char *)data, len);
+    ESP_LOGI(TAG, "%d Bytes send", len);
+    return (bytes_written == len) ? ESP_OK : ESP_FAIL;
+}
