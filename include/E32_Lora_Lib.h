@@ -72,11 +72,20 @@ typedef struct
 #pragma pack(pop)
 
 // Set pins before calling init
+void init_io(void);
 void e32_set_pins(const e32_pins_t *pins);
-
 void func(void);
 void wait_for_aux();
 void set_mode(enum MODE mode);
 esp_err_t e32_send_data(const uint8_t *data, size_t len);
 void sendConfiguration(e32_config_t *config);
+void get_config(void);
+void decode_config(uint8_t *e32_data, int e32_data_len);
+esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_len);
+void get_config(void);
+void decode_config(uint8_t *data, int len);
+bool e32_data_available();
+
+
+
 
