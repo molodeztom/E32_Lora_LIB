@@ -18,9 +18,7 @@
   */
 
 #include <stdio.h>
-//#include <string.h>
 #include "freertos/FreeRTOS.h"
-//#include "freertos/task.h"
 #include "E32_Lora_Lib.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
@@ -45,10 +43,6 @@ static e32_pins_t e32_pins = {
     .gpio_rxd = 13,
     .uart_port = UART_NUM_1
 };
-
-#define E32_CMD_READ_CONFIG 0xC1
-#define E32_CMD_WRITE_CONFIG 0xC0
-#define E32_CONFIG_HEADER 0xC0
 
 void e32_set_pins(const e32_pins_t *pins)
 {
@@ -116,6 +110,10 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
         return ESP_ERR_TIMEOUT;
     }
     *received_len = (size_t)len;
+    // Optional: null-terminate if there's space
+    if (*received_len < buffer_len) {
+        buffer[*received_len] = '\0';
+    }
     ESP_LOGI(TAG, "Received %d bytes", len);
     return ESP_OK;
 }
@@ -133,13 +131,14 @@ bool e32_data_available() {
 
 void e32_init_config(e32_config_t *config)
 {
-    config->HEAD = E32_CONFIG_HEADER; // This is the command to save parameters to non-volatile memory.
+    config->HEAD = 0xC0; // This is the command to save parameters to non-volatile memory.
     config->ADDH = 0x00;
     config->ADDL = 0x00;
     config->SPED.uartParity = E32_UART_PARITY_8N1;
     config->SPED.uartBaudRate = E32_UART_BAUD_RATE_9600;
     config->SPED.airDataRate = AIR_DATA_RATE_2400;
     config->CHAN = 0x06; // Kanal 7 (902.875MHz)
+    // Add explanation for 0x06: This corresponds to channel 7 in the frequency range.
     config->OPTION.fixedTransmission = TRANSMISSION_TRANSPARENT; // Transparent mode
     config->OPTION.ioDriveMode = IO_DRIVE_MODE_PUSH_PULL;
     config->OPTION.wirelessWakeupTime = WIRELESS_WAKEUP_TIME_250MS;
@@ -207,7 +206,7 @@ void sendConfiguration(e32_config_t *e32_config)
 void get_config()
 {
     // Read configuration from E32 module and print it in hex format
-    uint8_t e32_read_cmd[] = {E32_CMD_READ_CONFIG, E32_CMD_READ_CONFIG, E32_CMD_READ_CONFIG};
+    uint8_t e32_read_cmd[] = {0xC1, 0xC1, 0xC1}; // Command to read configuration (0xC1: Read module's configuration)
     ESP_LOGI(TAG, "Set programming mode");
     set_mode(MODE_SLEEP_PROG);
     ESP_LOGI(TAG, "Send configuration read command");
