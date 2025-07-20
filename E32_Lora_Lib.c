@@ -333,6 +333,13 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
 }
 
+// Version string for the E32_Lora_Lib
+#define E32_LORA_LIB_VERSION "E32_Lora_Lib V0.1 (20250518)"
+
+const char* e32_lora_lib_get_version(void) {
+    return E32_LORA_LIB_VERSION;
+}
+
 /*
 Recommendation for hardware stability:
 - For ESP32 UART RX pin, enable the internal pull-up resistor to avoid floating input when the line is idle.

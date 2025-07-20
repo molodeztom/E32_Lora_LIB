@@ -162,6 +162,13 @@ void decode_config(uint8_t *e32_data, int e32_data_len);
 esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_len);
 bool e32_data_available();
 
+// Version info for E32_Lora_Lib
+#define E32_LORA_LIB_VERSION "V0.1"
+#define E32_LORA_LIB_GIT_VERSION "20250720-git"
+
+// Returns the E32 library version string
+const char *e32_lora_lib_get_version(void);
+
 
 
 
