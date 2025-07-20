@@ -13,7 +13,8 @@
   -> LORA debug settings: y for extended output
 
   History: master if not shown otherwise
-  20250518:V0.1: initial version
+  20250518: V0.1: initial version
+  20250720: V0.2: filter with magic bytes
 
   */
 
@@ -25,6 +26,8 @@
 #include "esp_log.h"
 
 static const char *TAG = "LORA_LIB";
+// Version string for the E32_Lora_Lib
+#define E32_LORA_LIB_VERSION "E32_Lora_Lib V0.2 (20250518)"
 
 // Default-Pins
 
@@ -91,7 +94,8 @@ esp_err_t e32_send_data(const uint8_t *data, size_t len)
     return ESP_OK;
 }
 
-#define FILTER_MAGIC_BYTES_ENABLED 0 // Set to 0 to disable magic byte filtering
+#define FILTER_MAGIC_BYTES_ENABLED 0 // Set to 1 to enable magic byte filtering
+#define FILTER_LEGACY_REMOVE_LEADING_ENABLED 0 // Set to 1 to enable legacy filter
 #if FILTER_MAGIC_BYTES_ENABLED
 static const uint8_t MAGIC_BYTES[3] = {0xAA, 0xBB, 0xCC}; // Example magic bytes, change as needed
 #endif
@@ -114,7 +118,7 @@ static int filter_message_magic_bytes(uint8_t *buffer, int len) {
         }
     }
     return 0; // Magic bytes not found
-#else
+#elif FILTER_LEGACY_REMOVE_LEADING_ENABLED
     // Legacy filter: remove leading non-ASCII bytes
     int start = 0;
     while (start < len && (buffer[start] < 0x20 || buffer[start] > 0x7E)) {
@@ -129,6 +133,9 @@ static int filter_message_magic_bytes(uint8_t *buffer, int len) {
     } else {
         return 0;
     }
+#else
+    // No filtering
+    return len;
 #endif
 }
 
@@ -333,8 +340,7 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
 }
 
-// Version string for the E32_Lora_Lib
-#define E32_LORA_LIB_VERSION "E32_Lora_Lib V0.1 (20250518)"
+
 
 const char* e32_lora_lib_get_version(void) {
     return E32_LORA_LIB_VERSION;

@@ -1,0 +1,2 @@
+#pragma once
+#define E32_LORA_LIB_GIT_VERSION "unknown"
