@@ -61,7 +61,7 @@ void func(void)
 void wait_for_aux()
 {
     // AUX is HIGH, when module is ready
-    ESP_LOGI(TAG, "Wait for AUX to be HIGH");
+    //ESP_LOGI(TAG, "Wait for AUX to be HIGH");
     while (!gpio_get_level(e32_pins.gpio_aux))
     {
       vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB));
@@ -91,6 +91,47 @@ esp_err_t e32_send_data(const uint8_t *data, size_t len)
     return ESP_OK;
 }
 
+#define FILTER_MAGIC_BYTES_ENABLED 0 // Set to 0 to disable magic byte filtering
+#if FILTER_MAGIC_BYTES_ENABLED
+static const uint8_t MAGIC_BYTES[3] = {0xAA, 0xBB, 0xCC}; // Example magic bytes, change as needed
+#endif
+
+// Filter function: returns new length, or 0 if not found
+static int filter_message_magic_bytes(uint8_t *buffer, int len) {
+#if FILTER_MAGIC_BYTES_ENABLED
+    for (int i = 0; i <= len - 3; ++i) {
+        if (buffer[i] == MAGIC_BYTES[0] && buffer[i+1] == MAGIC_BYTES[1] && buffer[i+2] == MAGIC_BYTES[2]) {
+            // Found magic bytes, shift message to front
+            int new_len = len - i - 3;
+            if (new_len > 0) {
+                for (int j = 0; j < new_len; ++j) {
+                    buffer[j] = buffer[i + 3 + j];
+                }
+                return new_len;
+            } else {
+                return 0; // Only magic bytes, no message
+            }
+        }
+    }
+    return 0; // Magic bytes not found
+#else
+    // Legacy filter: remove leading non-ASCII bytes
+    int start = 0;
+    while (start < len && (buffer[start] < 0x20 || buffer[start] > 0x7E)) {
+        start++;
+    }
+    if (start < len) {
+        int new_len = len - start;
+        for (int i = 0; i < new_len; ++i) {
+            buffer[i] = buffer[start + i];
+        }
+        return new_len;
+    } else {
+        return 0;
+    }
+#endif
+}
+
 esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_len)
 {
     if (buffer == NULL || received_len == NULL) {
@@ -106,15 +147,21 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
     }
     if (len == 0) {
         *received_len = 0;
-        ESP_LOGW(TAG, "No data received (timeout)");
+        // ESP_LOGW(TAG, "No data received (timeout)"); // Silenced to avoid log spam during polling
         return ESP_ERR_TIMEOUT;
     }
-    *received_len = (size_t)len;
+    // Filter using magic bytes or legacy filter
+    int filtered_len = filter_message_magic_bytes(buffer, len);
+    if (filtered_len == 0) {
+        *received_len = 0;
+        return ESP_ERR_TIMEOUT;
+    }
+    *received_len = (size_t)filtered_len;
     // Optional: null-terminate if there's space
     if (*received_len < buffer_len) {
         buffer[*received_len] = '\0';
     }
-    ESP_LOGI(TAG, "Received %d bytes", len);
+    ESP_LOGI(TAG, "Received %d bytes", filtered_len);
     return ESP_OK;
 }
 
@@ -180,6 +227,9 @@ void init_io()
     uart_driver_install(E32_UART_PORT, BUF_SIZE * 2, 0, 0, NULL, 0);                                 // install UART driver
     uart_param_config(E32_UART_PORT, &uart_config);                                                  // configure UART parameters
     uart_set_pin(E32_UART_PORT, e32_pins.gpio_txd, e32_pins.gpio_rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); // set UART pins
+
+    // Activate internal pull-up on RX pin to avoid floating input
+    gpio_set_pull_mode(e32_pins.gpio_rxd, GPIO_PULLUP_ONLY);
 /* #if CONFIG_DEBUG_LORA
     gpio_dump_io_configuration(stdout, (1ULL << 10) | (1ULL << 11) | (1ULL << 12) | (1ULL << 13) | (1ULL << 14));
     ESP_LOGI(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d", E32_M0_GPIO, E32_M1_GPIO, E32_TXD_GPIO, E32_RXD_GPIO, E32_AUX_GPIO);
@@ -201,6 +251,9 @@ void sendConfiguration(e32_config_t *e32_config)
     wait_for_aux();                // Wait for AUX to be HIGH
     set_mode(MODE_NORMAL);                // Set back to normal mode (M0=0, M1=0)
     ESP_LOGI(TAG, "Configuration command sent to E32 module");
+
+    // Flush UART RX buffer after config to avoid leftover config/status bytes
+    uart_flush_input(E32_UART_PORT);
 }
 
 void get_config()
@@ -279,3 +332,13 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     printf("FEC Enabled: %s\n", e32_fec_enabled ? "Yes" : "No");
     printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
 }
+
+/*
+Recommendation for hardware stability:
+- For ESP32 UART RX pin, enable the internal pull-up resistor to avoid floating input when the line is idle.
+  Example (replace RX_PIN with your actual RX GPIO number):
+    gpio_set_pull_mode(RX_PIN, GPIO_PULLUP_ONLY);
+- Avoid using pull-down on RX unless your hardware specifically requires it.
+- Ensure both devices share a common ground.
+- Keep UART lines as short as possible and avoid running them parallel to high-current traces.
+*/
