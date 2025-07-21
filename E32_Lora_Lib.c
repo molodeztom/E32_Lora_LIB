@@ -26,8 +26,7 @@
 #include "esp_log.h"
 
 static const char *TAG = "LORA_LIB";
-// Version string for the E32_Lora_Lib
-#define E32_LORA_LIB_VERSION "E32_Lora_Lib V0.2 (20250518)"
+
 
 // Default-Pins
 
@@ -343,7 +342,7 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
 
 
 const char* e32_lora_lib_get_version(void) {
-    return E32_LORA_LIB_VERSION;
+    return APP_VERSION;
 }
 
 /*
