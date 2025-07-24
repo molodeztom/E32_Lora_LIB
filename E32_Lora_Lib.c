@@ -53,7 +53,7 @@ void e32_set_pins(const e32_pins_t *pins)
     }
 }
 
-void func(void)
+void initLibrary()
 {
     ESP_LOGI(TAG, "LoRAESPIDFLib V0.1");
     gpio_get_level(e32_pins.gpio_aux);

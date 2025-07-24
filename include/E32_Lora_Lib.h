@@ -152,7 +152,7 @@ enum TRANSMISSION_POWER
 void init_io(void);
 void e32_init_config(e32_config_t *config);
 void e32_set_pins(const e32_pins_t *pins);
-void func(void);
+void initLibrary(void);
 void wait_for_aux();
 void set_mode(enum MODE mode);
 esp_err_t e32_send_data(const uint8_t *data, size_t len);
