@@ -332,12 +332,16 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
 {
     if (e32_data_len < 6)
     {
-        printf("Invalid configuration data length: %d bytes\n", e32_data_len);
+        ESP_LOGE(TAG, "Invalid configuration data length: %d bytes", e32_data_len);
         return;
     }
-    for (int i = 0; i < e32_data_len; i++)
-        printf("%02X ", e32_data[i]);
-    printf("\n");
+    
+    // Print hex representation of configuration data
+    char hex_str[e32_data_len * 3 + 1]; // Each byte becomes 2 hex chars + 1 space + null terminator
+    for (int i = 0; i < e32_data_len; i++) {
+        sprintf(hex_str + i * 3, "%02X ", e32_data[i]);
+    }
+    ESP_LOGD(TAG, "Config data (hex): %s", hex_str);
     // Extract fields based on E32 response format
     uint8_t e32_header = e32_data[0];
     uint16_t e32_address = (e32_data[1] << 8) | e32_data[2];
@@ -367,18 +371,18 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     uint8_t e32_wakeup_time = (e32_option & E32_WAKEUP_TIME_MASK) >> E32_WAKEUP_TIME_SHIFT;     // Extract wakeup time bits
     uint8_t e32_fec_enabled = (e32_option & E32_FEC_MASK) >> E32_FEC_SHIFT;                     // Extract FEC enabled bit
     uint8_t e32_tx_power = (e32_option & E32_TX_POWER_MASK);                                    // Extract TX power bits
-    printf("E32 Module Configuration:\n");
-    printf("Header: 0x%02X\n", e32_header);
-    printf("Address: 0x%04X\n", e32_address);
-    printf("UART Parity: %s \n", e32_uart_parity < 4 ? e32_uart_parity_bit[e32_uart_parity] : "Unknown");
-    printf("UART Baud Rate: %s bps\n", e32_uart_baud < 8 ? e32_uart_baudrates[e32_uart_baud] : "Unknown");
-    printf("Air Data Rate: %s\n", e32_air_rate < 6 ? e32_air_rates[e32_air_rate] : "Unknown");
-    printf("Channel: %d (%.1f MHz)\n", e32_channel, E32_BASE_FREQUENCY + e32_channel);
-    printf("Transmission Mode: %s\n", e32_transmission_mode_str[e32_transmission_mode]);
-    printf("I/O Mode: %s\n", e32_io_mode_str[e32_io_mode]);
-    printf("Wakeup Time: %d ms\n", (e32_wakeup_time + 1) * E32_WAKEUP_TIME_MULTIPLIER); // Wakeup time in ms
-    printf("FEC Enabled: %s\n", e32_fec_enabled ? "Yes" : "No");
-    printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
+    ESP_LOGI(TAG, "E32 Module Configuration:");
+    ESP_LOGI(TAG, "Header: 0x%02X", e32_header);
+    ESP_LOGI(TAG, "Address: 0x%04X", e32_address);
+    ESP_LOGI(TAG, "UART Parity: %s", e32_uart_parity < 4 ? e32_uart_parity_bit[e32_uart_parity] : "Unknown");
+    ESP_LOGI(TAG, "UART Baud Rate: %s bps", e32_uart_baud < 8 ? e32_uart_baudrates[e32_uart_baud] : "Unknown");
+    ESP_LOGI(TAG, "Air Data Rate: %s", e32_air_rate < 6 ? e32_air_rates[e32_air_rate] : "Unknown");
+    ESP_LOGI(TAG, "Channel: %d (%.1f MHz)", e32_channel, E32_BASE_FREQUENCY + e32_channel);
+    ESP_LOGI(TAG, "Transmission Mode: %s", e32_transmission_mode_str[e32_transmission_mode]);
+    ESP_LOGI(TAG, "I/O Mode: %s", e32_io_mode_str[e32_io_mode]);
+    ESP_LOGI(TAG, "Wakeup Time: %d ms", (e32_wakeup_time + 1) * E32_WAKEUP_TIME_MULTIPLIER); // Wakeup time in ms
+    ESP_LOGI(TAG, "FEC Enabled: %s", e32_fec_enabled ? "Yes" : "No");
+    ESP_LOGI(TAG, "TX Power: %s", e32_tx_power_str[e32_tx_power]);
 }
 
 const char* e32_lora_lib_get_version(void) {
