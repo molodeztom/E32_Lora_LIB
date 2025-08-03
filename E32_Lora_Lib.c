@@ -258,6 +258,7 @@ static void init_io(void)
         .pull_up_en = GPIO_PULLUP_DISABLE                              // disable pull-up mode
     };
     gpio_config(&mode_conf);
+    ESP_LOGD(TAG, "Initialize AUX Pin");
     // configure AUX pin
     gpio_config_t aux_conf = {
         .intr_type = GPIO_INTR_DISABLE,         // no interrupt
@@ -267,7 +268,7 @@ static void init_io(void)
         .pull_up_en = GPIO_PULLUP_DISABLE       // disable pull-up mode
     };
     gpio_config(&aux_conf);
-
+  ESP_LOGD(TAG, "Initialize Uart Pin");
     // configure UART with the given settings
     uart_config_t uart_config = {
         .baud_rate = E32_UART_BAUD_RATE,       // baud rate
@@ -276,6 +277,7 @@ static void init_io(void)
         .stop_bits = UART_STOP_BITS_1,         // stop bits
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // no flow control
     };
+     ESP_LOGD(TAG, "Initialize UART");
     uart_driver_install(E32_UART_PORT, E32_UART_BUF_SIZE * 2, 0, 0, NULL, 0);                        // install UART driver
     uart_param_config(E32_UART_PORT, &uart_config);                                                  // configure UART parameters
     uart_set_pin(E32_UART_PORT, e32_pins.gpio_txd, e32_pins.gpio_rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); // set UART pins
