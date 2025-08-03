@@ -19,6 +19,7 @@
    20250802: V0.4: add defines for magic bytes and legacy filter
    20250802: V0.5: add receive message with terminator function
    20250803: V0.6: add automatic version number handling
+   20250803: V0.7: optimize debug output, remove unnecessary debug output
 
    */
 
@@ -38,6 +39,7 @@ static const char *TAG = "LORA_LIB";
 #define E32_PIN_AUX 14              // AUX pin for status indication
 #define E32_PIN_TXD 12              // TXD pin (ESP32 TX to E32 RX)
 #define E32_PIN_RXD 13              // RXD pin (ESP32 RX from E32 TX)
+
 
 // UART configuration
 #define E32_UART_BAUD_RATE 9600     // Default UART baud rate
@@ -73,15 +75,6 @@ static const char *TAG = "LORA_LIB";
 #define E32_WAKEUP_TIME_MULTIPLIER 250 // Multiplier for wakeup time in ms
 
 
-// Default-Pins
-
-// Pin configuration
-/* #define E32_M0_GPIO 10
-#define E32_M1_GPIO 11
-#define E32_AUX_GPIO 14
-#define E32_TXD_GPIO 12 // TXD Pin on ESP32
-#define E32_RXD_GPIO 13 // RXD Pin on ESP32 */
-
 static e32_pins_t e32_pins = {
     .gpio_m0 = E32_PIN_M0,
     .gpio_m1 = E32_PIN_M1,
@@ -106,7 +99,7 @@ void initLibrary()
 #ifdef E32_APP_VERSION_NUMBER
     ESP_LOGI(TAG, "LoRAESPIDFLib %s", E32_APP_VERSION_NUMBER);
 #else
-    ESP_LOGI(TAG, "LoRAESPIDFLib V0.5");
+    ESP_LOGI(TAG, "LoRAESPIDFLib V0.7");
 #endif
     init_io();
     gpio_get_level(e32_pins.gpio_aux);
@@ -142,7 +135,7 @@ esp_err_t e32_send_data(const uint8_t *data, size_t len)
         ESP_LOGW(TAG, "UART write incomplete: %d/%d bytes", bytes_written, (int)len);
         return ESP_FAIL;
     }
-    ESP_LOGI(TAG, "%d Bytes send", len);
+    ESP_LOGD(TAG, "%d Bytes send", len);
     return ESP_OK;
 }
 
@@ -220,7 +213,7 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
     if (*received_len < buffer_len) {
         buffer[*received_len] = '\0';
     }
-    ESP_LOGI(TAG, "Received %d bytes", filtered_len);
+    ESP_LOGD(TAG, "Received %d bytes", filtered_len);
     return ESP_OK;
 }
 
@@ -255,7 +248,7 @@ void e32_init_config(e32_config_t *config)
 // Private function to initialize IO pins
 static void init_io(void)
 {
-    ESP_LOGI(TAG, "Initialisiere IO-Pins");
+    ESP_LOGD(TAG, "Initialize IO-Pins");
     // configure command pins M0 and M1
     gpio_config_t mode_conf = {
         .intr_type = GPIO_INTR_DISABLE,                                // no interrupt
@@ -289,26 +282,28 @@ static void init_io(void)
 
     // Activate internal pull-up on RX pin to avoid floating input
     gpio_set_pull_mode(e32_pins.gpio_rxd, GPIO_PULLUP_ONLY);
-/* #if CONFIG_DEBUG_LORA
+#ifdef CONFIG_ENABLE_DEBUG_OUTPUT
+    // Commented out potentially problematic function
     gpio_dump_io_configuration(stdout, (1ULL << 10) | (1ULL << 11) | (1ULL << 12) | (1ULL << 13) | (1ULL << 14));
-    ESP_LOGI(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d", E32_M0_GPIO, E32_M1_GPIO, E32_TXD_GPIO, E32_RXD_GPIO, E32_AUX_GPIO);
-#endif */
+    ESP_LOGD(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d",
+             E32_PIN_M0, E32_PIN_M1, E32_PIN_TXD, E32_PIN_RXD, E32_PIN_AUX);
+#endif
 }
 
 void sendConfiguration(e32_config_t *e32_config)
 {
-    ESP_LOGI(TAG, "Send configuration to E32 module");
+    ESP_LOGD(TAG, "Send configuration to E32 module");
 
     set_mode(MODE_SLEEP_PROG);                 // Set to programming mode (M0=1, M1=1)
     vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
 
-    ESP_LOGI(TAG, "Send configuration command to E32 module");
+    ESP_LOGD(TAG, "Send configuration command to E32 module");
 
     ESP_ERROR_CHECK(e32_send_data((uint8_t *)e32_config, sizeof(e32_config_t)));
     vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
     wait_for_aux();                // Wait for AUX to be HIGH
     set_mode(MODE_NORMAL);                // Set back to normal mode (M0=0, M1=0)
-    ESP_LOGI(TAG, "Configuration command sent to E32 module");
+    ESP_LOGD(TAG, "Configuration command sent to E32 module");
 
     // Flush UART RX buffer after config to avoid leftover config/status bytes
     uart_flush_input(E32_UART_PORT);
@@ -318,9 +313,9 @@ void get_config()
 {
     // Read configuration from E32 module and print it in hex format
     uint8_t e32_read_cmd[] = {E32_CONFIG_READ_CMD, E32_CONFIG_READ_CMD, E32_CONFIG_READ_CMD}; // Command to read configuration
-    ESP_LOGI(TAG, "Set programming mode");
+    ESP_LOGD(TAG, "Set programming mode");
     set_mode(MODE_SLEEP_PROG);
-    ESP_LOGI(TAG, "Send configuration read command");
+    ESP_LOGD(TAG, "Send configuration read command");
     ESP_ERROR_CHECK(e32_send_data(e32_read_cmd, sizeof(e32_read_cmd)));
     vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
     wait_for_aux();
@@ -328,7 +323,7 @@ void get_config()
     int e32_rx_len = uart_read_bytes(E32_UART_PORT, e32_rx_buffer, E32_UART_BUF_SIZE, pdMS_TO_TICKS(E32_CONFIG_READ_TIMEOUT_MS));
     if (e32_rx_len > 0)
     {
-        ESP_LOGI(TAG, "Configuration received (%d bytes):", e32_rx_len);
+        ESP_LOGD(TAG, "Configuration received (%d bytes):", e32_rx_len);
         decode_config(e32_rx_buffer, e32_rx_len); // Decode and print config in plain text
     }
     else
