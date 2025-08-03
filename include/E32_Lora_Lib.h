@@ -151,6 +151,39 @@ enum TRANSMISSION_POWER
 
 
 
+// Callback type for delay function
+typedef void (*e32_delay_callback_t)(uint32_t ms);
+
+/**
+ * @brief Receive a message with terminator character
+ *
+ * This function implements a polling-based receiver for messages with the following features:
+ * 1. Waits for a reply for up to timeout_ms milliseconds
+ * 2. Polls the LoRa module periodically using the provided delay callback
+ * 3. Accumulates received data until one of these conditions is met:
+ *    - A terminator character is received
+ *    - The buffer size limit is reached
+ *    - The timeout period expires
+ *
+ * @param buffer Buffer to store the received message
+ * @param buffer_size Size of the buffer
+ * @param message_len Pointer to store the length of the received message
+ * @param terminator Character that marks the end of a message
+ * @param timeout_ms Maximum time to wait for a complete message
+ * @param poll_interval_ms Time between polling attempts
+ * @param delay_callback Function to call for implementing delays
+ * @return esp_err_t ESP_OK if successful, ESP_ERR_TIMEOUT if no complete message received
+ */
+esp_err_t e32_receive_message_with_terminator(
+    uint8_t *buffer,
+    size_t buffer_size,
+    size_t *message_len,
+    uint8_t terminator,
+    uint32_t timeout_ms,
+    uint32_t poll_interval_ms,
+    e32_delay_callback_t delay_callback
+);
+
 // Set pins before calling init
 void e32_init_config(e32_config_t *config);
 void e32_set_pins(const e32_pins_t *pins);

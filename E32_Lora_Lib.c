@@ -17,10 +17,12 @@
    20250720: V0.2: filter with magic bytes
    20250802: V0.3: execute init_io internally
    20250802: V0.4: add defines for magic bytes and legacy filter
+   20250802: V0.5: add receive message with terminator function
 
    */
 
 #include <stdio.h>
+#include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "E32_Lora_Lib.h"
 #include "driver/gpio.h"
@@ -100,7 +102,7 @@ void e32_set_pins(const e32_pins_t *pins)
 
 void initLibrary()
 {
-    ESP_LOGI(TAG, "LoRAESPIDFLib V0.4");
+    ESP_LOGI(TAG, "LoRAESPIDFLib V0.5");
     init_io();
     gpio_get_level(e32_pins.gpio_aux);
 }
@@ -386,6 +388,74 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
 
 const char* e32_lora_lib_get_version(void) {
     return APP_VERSION;
+}
+
+esp_err_t e32_receive_message_with_terminator(
+    uint8_t *buffer,
+    size_t buffer_size,
+    size_t *message_len,
+    uint8_t terminator,
+    uint32_t timeout_ms,
+    uint32_t poll_interval_ms,
+    e32_delay_callback_t delay_callback)
+{
+    if (buffer == NULL || message_len == NULL || delay_callback == NULL) {
+        ESP_LOGE(TAG, "Null pointer argument in e32_receive_message_with_terminator");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    if (buffer_size == 0) {
+        ESP_LOGE(TAG, "Buffer size cannot be zero");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    size_t total_received = 0;
+    uint32_t waited_ms = 0;
+    esp_err_t err = ESP_OK;
+    bool got_terminator = false;
+    
+    // Initial delay before starting to receive
+    delay_callback(poll_interval_ms);
+    
+    ESP_LOGD(TAG, "Waiting for reply up to %" PRIu32 " ms...", timeout_ms);
+    
+    while (waited_ms < timeout_ms && !got_terminator && total_received < buffer_size) {
+        size_t received = 0;
+        err = e32_receive_data(buffer + total_received, buffer_size - total_received, &received);
+        
+        if (err == ESP_OK && received > 0) {
+            // Check for terminator in newly received data
+            for (size_t i = 0; i < received; i++) {
+                if (buffer[total_received + i] == terminator) {
+                    got_terminator = true;
+                    total_received += i + 1; // include the terminator
+                    break;
+                }
+            }
+            
+            if (!got_terminator) {
+                total_received += received;
+            }
+        }
+        
+        if (!got_terminator) {
+            delay_callback(poll_interval_ms);
+            waited_ms += poll_interval_ms;
+        }
+    }
+    
+    *message_len = total_received;
+    
+    if (got_terminator) {
+        ESP_LOGD(TAG, "Received complete message (%" PRIu32 " bytes)", (uint32_t)total_received);
+        return ESP_OK;
+    } else if (total_received > 0) {
+        ESP_LOGD(TAG, "Received partial message (%" PRIu32 " bytes, no terminator)", (uint32_t)total_received);
+        return ESP_OK;
+    } else {
+        ESP_LOGD(TAG, "No reply received within timeout");
+        return ESP_ERR_TIMEOUT;
+    }
 }
 
 /*
