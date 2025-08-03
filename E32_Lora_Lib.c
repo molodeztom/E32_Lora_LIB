@@ -104,7 +104,7 @@ void e32_set_pins(const e32_pins_t *pins)
 void initLibrary()
 {
 #ifdef E32_APP_VERSION_NUMBER
-    ESP_LOGI(TAG, "LoRAESPIDFLib V%s", E32_APP_VERSION_NUMBER);
+    ESP_LOGI(TAG, "LoRAESPIDFLib %s", E32_APP_VERSION_NUMBER);
 #else
     ESP_LOGI(TAG, "LoRAESPIDFLib V0.5");
 #endif

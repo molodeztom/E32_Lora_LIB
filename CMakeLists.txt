@@ -34,7 +34,7 @@ idf_component_register(SRCS "E32_Lora_Lib.c"
                        INCLUDE_DIRS "include")
 
 # Add the Git version and version number as compile definitions
-target_compile_definitions(${COMPONENT_LIB} PRIVATE
+target_compile_definitions(${COMPONENT_LIB} PUBLIC
     E32_APP_VERSION="${E32_GIT_VERSION}"
     E32_APP_VERSION_NUMBER="${E32_VERSION_NUMBER}"
 )

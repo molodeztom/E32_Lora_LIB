@@ -198,9 +198,15 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
 bool e32_data_available();
 
 // Version info for E32_Lora_Lib
-#define E32_LORA_LIB_VERSION "V0.5"
+// Use the version number extracted from Git tags if available
+#ifdef E32_APP_VERSION_NUMBER
+#define E32_LORA_LIB_VERSION "V" E32_APP_VERSION_NUMBER
+#else
+#define E32_LORA_LIB_VERSION "V0.6"
+#endif
 
 // Use Git version if available, otherwise fallback to a default
+// Note: This needs to be a string literal, not just the macro name
 #ifdef E32_APP_VERSION
 #define E32_LORA_LIB_GIT_VERSION E32_APP_VERSION
 #else
