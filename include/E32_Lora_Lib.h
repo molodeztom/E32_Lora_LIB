@@ -149,7 +149,6 @@ enum TRANSMISSION_POWER
 
 
 // Set pins before calling init
-void init_io(void);
 void e32_init_config(e32_config_t *config);
 void e32_set_pins(const e32_pins_t *pins);
 void initLibrary(void);

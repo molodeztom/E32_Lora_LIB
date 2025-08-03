@@ -2,21 +2,22 @@
  E32-900T30D LoRa Lib
 
 
-  Hardware:
-  ESP32-S3-DevKitC-1 mit Wroom N16R8
-  LoRa E32-900T30D connected M0 M1 and Rx Tx
+   Hardware:
+   ESP32-S3-DevKitC-1 mit Wroom N16R8
+   LoRa E32-900T30D connected M0 M1 and Rx Tx
 
-  Try sending a message to remote LoRa
+   Try sending a message to remote LoRa
 
-  Project settings:
-  ESP-IDF config editor:
-  -> LORA debug settings: y for extended output
+   Project settings:
+   ESP-IDF config editor:
+   -> LORA debug settings: y for extended output
 
-  History: master if not shown otherwise
-  20250518: V0.1: initial version
-  20250720: V0.2: filter with magic bytes
+   History: master if not shown otherwise
+   20250518: V0.1: initial version
+   20250720: V0.2: filter with magic bytes
+   20250802: V0.3: execute init_io internally
 
-  */
+   */
 
 #include <stdio.h>
 #include "freertos/FreeRTOS.h"
@@ -46,6 +47,9 @@ static e32_pins_t e32_pins = {
     .uart_port = UART_NUM_1
 };
 
+// Forward declaration of internal functions
+static void init_io(void);
+
 void e32_set_pins(const e32_pins_t *pins)
 {
     if (pins != NULL) {
@@ -56,8 +60,8 @@ void e32_set_pins(const e32_pins_t *pins)
 void initLibrary()
 {
     ESP_LOGI(TAG, "LoRAESPIDFLib V0.1");
+    init_io();
     gpio_get_level(e32_pins.gpio_aux);
-
 }
 
 void wait_for_aux()
@@ -69,6 +73,7 @@ void wait_for_aux()
       vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB));
     }
 } 
+
 void set_mode(enum MODE mode)
 {
     gpio_set_level(e32_pins.gpio_m0, (mode & 0b01));
@@ -199,8 +204,8 @@ void e32_init_config(e32_config_t *config)
     config->OPTION.transmissionPower = TRANSMISSION_POWER_30dBm; // 30dBm
 }
 
-
-void init_io()
+// Private function to initialize IO pins
+static void init_io(void)
 {
     ESP_LOGI(TAG, "Initialisiere IO-Pins");
     // configure command pins M0 and M1
@@ -241,7 +246,6 @@ void init_io()
     ESP_LOGI(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d", E32_M0_GPIO, E32_M1_GPIO, E32_TXD_GPIO, E32_RXD_GPIO, E32_AUX_GPIO);
 #endif */
 }
-
 
 void sendConfiguration(e32_config_t *e32_config)
 {
@@ -338,8 +342,6 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     printf("FEC Enabled: %s\n", e32_fec_enabled ? "Yes" : "No");
     printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
 }
-
-
 
 const char* e32_lora_lib_get_version(void) {
     return APP_VERSION;
