@@ -39,4 +39,9 @@ target_compile_definitions(${COMPONENT_LIB} PUBLIC
     E32_APP_VERSION_NUMBER="${E32_VERSION_NUMBER}"
 )
 
+# Propagate the CONFIG_ENABLE_DEBUG_OUTPUT from the main project
+if(CONFIG_ENABLE_DEBUG_OUTPUT)
+    target_compile_definitions(${COMPONENT_LIB} PUBLIC CONFIG_ENABLE_DEBUG_OUTPUT=1)
+endif()
+
 message(STATUS "Building E32_Lora_Lib with version: ${E32_VERSION_NUMBER} (${E32_GIT_VERSION})")

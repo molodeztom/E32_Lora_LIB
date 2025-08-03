@@ -282,12 +282,7 @@ static void init_io(void)
 
     // Activate internal pull-up on RX pin to avoid floating input
     gpio_set_pull_mode(e32_pins.gpio_rxd, GPIO_PULLUP_ONLY);
-#ifdef CONFIG_ENABLE_DEBUG_OUTPUT
-    // Commented out potentially problematic function
-    gpio_dump_io_configuration(stdout, (1ULL << 10) | (1ULL << 11) | (1ULL << 12) | (1ULL << 13) | (1ULL << 14));
-    ESP_LOGD(TAG, "GPIO M0: %d, M1: %d, TXD: %d, RXD: %d, AUX: %d",
-             E32_PIN_M0, E32_PIN_M1, E32_PIN_TXD, E32_PIN_RXD, E32_PIN_AUX);
-#endif
+
 }
 
 void sendConfiguration(e32_config_t *e32_config)
