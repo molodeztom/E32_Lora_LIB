@@ -18,6 +18,7 @@
    20250802: V0.3: execute init_io internally
    20250802: V0.4: add defines for magic bytes and legacy filter
    20250802: V0.5: add receive message with terminator function
+   20250803: V0.6: add automatic version number handling
 
    */
 
@@ -102,7 +103,11 @@ void e32_set_pins(const e32_pins_t *pins)
 
 void initLibrary()
 {
+#ifdef E32_APP_VERSION_NUMBER
+    ESP_LOGI(TAG, "LoRAESPIDFLib V%s", E32_APP_VERSION_NUMBER);
+#else
     ESP_LOGI(TAG, "LoRAESPIDFLib V0.5");
+#endif
     init_io();
     gpio_get_level(e32_pins.gpio_aux);
 }
@@ -387,7 +392,11 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
 }
 
 const char* e32_lora_lib_get_version(void) {
-    return APP_VERSION;
+#ifdef E32_APP_VERSION
+    return E32_APP_VERSION;
+#else
+    return "unknown";
+#endif
 }
 
 esp_err_t e32_receive_message_with_terminator(

@@ -198,8 +198,14 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
 bool e32_data_available();
 
 // Version info for E32_Lora_Lib
-#define E32_LORA_LIB_VERSION "V0.1"
-#define E32_LORA_LIB_GIT_VERSION "20250720-git"
+#define E32_LORA_LIB_VERSION "V0.5"
+
+// Use Git version if available, otherwise fallback to a default
+#ifdef E32_APP_VERSION
+#define E32_LORA_LIB_GIT_VERSION E32_APP_VERSION
+#else
+#define E32_LORA_LIB_GIT_VERSION "unknown-git"
+#endif
 
 // Returns the E32 library version string
 const char *e32_lora_lib_get_version(void);
