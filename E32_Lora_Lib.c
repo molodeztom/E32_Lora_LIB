@@ -16,6 +16,7 @@
    20250518: V0.1: initial version
    20250720: V0.2: filter with magic bytes
    20250802: V0.3: execute init_io internally
+   20250802: V0.4: add defines for magic bytes and legacy filter
 
    */
 
@@ -28,6 +29,46 @@
 
 static const char *TAG = "LORA_LIB";
 
+// E32 pin definitions
+#define E32_PIN_M0 10               // M0 pin for mode control
+#define E32_PIN_M1 11               // M1 pin for mode control
+#define E32_PIN_AUX 14              // AUX pin for status indication
+#define E32_PIN_TXD 12              // TXD pin (ESP32 TX to E32 RX)
+#define E32_PIN_RXD 13              // RXD pin (ESP32 RX from E32 TX)
+
+// UART configuration
+#define E32_UART_BAUD_RATE 9600     // Default UART baud rate
+
+// E32 configuration constants
+#define E32_CONFIG_SAVE_CMD 0xC0       // Command to save parameters to non-volatile memory
+#define E32_CONFIG_READ_CMD 0xC1       // Command to read configuration
+#define E32_DEFAULT_ADDR_H 0x00        // Default high address byte
+#define E32_DEFAULT_ADDR_L 0x00        // Default low address byte
+#define E32_DEFAULT_CHANNEL 0x06       // Default channel (902.875MHz)
+#define E32_UART_TIMEOUT_MS 100        // UART read timeout in milliseconds
+#define E32_CONFIG_READ_TIMEOUT_MS 200 // Timeout for reading configuration
+
+// E32 bit masks for configuration parsing
+#define E32_CHANNEL_MASK 0x1F          // Mask to extract channel number (bits 0-4)
+#define E32_UART_BAUD_MASK 0x38        // Mask to extract UART baud rate (bits 3-5)
+#define E32_UART_BAUD_SHIFT 3          // Shift for UART baud rate bits
+#define E32_UART_PARITY_MASK 0xC0      // Mask to extract UART parity (bits 6-7)
+#define E32_UART_PARITY_SHIFT 6        // Shift for UART parity bits
+#define E32_AIR_RATE_MASK 0x07         // Mask to extract air data rate (bits 0-2)
+#define E32_TRANS_MODE_MASK 0x80       // Mask to extract transmission mode (bit 7)
+#define E32_TRANS_MODE_SHIFT 7         // Shift for transmission mode bit
+#define E32_IO_MODE_MASK 0x40          // Mask to extract I/O mode (bit 6)
+#define E32_IO_MODE_SHIFT 6            // Shift for I/O mode bit
+#define E32_WAKEUP_TIME_MASK 0x38      // Mask to extract wakeup time (bits 3-5)
+#define E32_WAKEUP_TIME_SHIFT 3        // Shift for wakeup time bits
+#define E32_FEC_MASK 0x04              // Mask to extract FEC enabled (bit 2)
+#define E32_FEC_SHIFT 2                // Shift for FEC bit
+#define E32_TX_POWER_MASK 0x03         // Mask to extract TX power (bits 0-1)
+
+// E32 frequency calculation
+#define E32_BASE_FREQUENCY 862.0       // Base frequency in MHz
+#define E32_WAKEUP_TIME_MULTIPLIER 250 // Multiplier for wakeup time in ms
+
 
 // Default-Pins
 
@@ -39,12 +80,12 @@ static const char *TAG = "LORA_LIB";
 #define E32_RXD_GPIO 13 // RXD Pin on ESP32 */
 
 static e32_pins_t e32_pins = {
-    .gpio_m0 = 10,
-    .gpio_m1 = 11,
-    .gpio_aux = 14,
-    .gpio_txd = 12,
-    .gpio_rxd = 13,
-    .uart_port = UART_NUM_1
+    .gpio_m0 = E32_PIN_M0,
+    .gpio_m1 = E32_PIN_M1,
+    .gpio_aux = E32_PIN_AUX,
+    .gpio_txd = E32_PIN_TXD,
+    .gpio_rxd = E32_PIN_RXD,
+    .uart_port = E32_UART_PORT
 };
 
 // Forward declaration of internal functions
@@ -59,7 +100,7 @@ void e32_set_pins(const e32_pins_t *pins)
 
 void initLibrary()
 {
-    ESP_LOGI(TAG, "LoRAESPIDFLib V0.1");
+    ESP_LOGI(TAG, "LoRAESPIDFLib V0.4");
     init_io();
     gpio_get_level(e32_pins.gpio_aux);
 }
@@ -150,7 +191,7 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
         return ESP_ERR_INVALID_ARG;
     }
     wait_for_aux(); // Wait for AUX to be HIGH
-    int len = uart_read_bytes(E32_UART_PORT, buffer, buffer_len, pdMS_TO_TICKS(100));
+    int len = uart_read_bytes(E32_UART_PORT, buffer, buffer_len, pdMS_TO_TICKS(E32_UART_TIMEOUT_MS));
     if (len < 0) {
         ESP_LOGE(TAG, "UART read error: %d", len);
         *received_len = 0;
@@ -189,13 +230,13 @@ bool e32_data_available() {
 
 void e32_init_config(e32_config_t *config)
 {
-    config->HEAD = 0xC0; // This is the command to save parameters to non-volatile memory.
-    config->ADDH = 0x00;
-    config->ADDL = 0x00;
+    config->HEAD = E32_CONFIG_SAVE_CMD; // Command to save parameters to non-volatile memory
+    config->ADDH = E32_DEFAULT_ADDR_H;
+    config->ADDL = E32_DEFAULT_ADDR_L;
     config->SPED.uartParity = E32_UART_PARITY_8N1;
     config->SPED.uartBaudRate = E32_UART_BAUD_RATE_9600;
     config->SPED.airDataRate = AIR_DATA_RATE_2400;
-    config->CHAN = 0x06; // Kanal 7 (902.875MHz)
+    config->CHAN = E32_DEFAULT_CHANNEL; // Channel 7 (902.875MHz)
     // Add explanation for 0x06: This corresponds to channel 7 in the frequency range.
     config->OPTION.fixedTransmission = TRANSMISSION_TRANSPARENT; // Transparent mode
     config->OPTION.ioDriveMode = IO_DRIVE_MODE_PUSH_PULL;
@@ -229,13 +270,13 @@ static void init_io(void)
 
     // configure UART with the given settings
     uart_config_t uart_config = {
-        .baud_rate = 9600,                     // baud rate
+        .baud_rate = E32_UART_BAUD_RATE,       // baud rate
         .data_bits = UART_DATA_8_BITS,         // data bits
         .parity = UART_PARITY_DISABLE,         // no parity
         .stop_bits = UART_STOP_BITS_1,         // stop bits
         .flow_ctrl = UART_HW_FLOWCTRL_DISABLE, // no flow control
     };
-    uart_driver_install(E32_UART_PORT, BUF_SIZE * 2, 0, 0, NULL, 0);                                 // install UART driver
+    uart_driver_install(E32_UART_PORT, E32_UART_BUF_SIZE * 2, 0, 0, NULL, 0);                        // install UART driver
     uart_param_config(E32_UART_PORT, &uart_config);                                                  // configure UART parameters
     uart_set_pin(E32_UART_PORT, e32_pins.gpio_txd, e32_pins.gpio_rxd, UART_PIN_NO_CHANGE, UART_PIN_NO_CHANGE); // set UART pins
 
@@ -269,15 +310,15 @@ void sendConfiguration(e32_config_t *e32_config)
 void get_config()
 {
     // Read configuration from E32 module and print it in hex format
-    uint8_t e32_read_cmd[] = {0xC1, 0xC1, 0xC1}; // Command to read configuration (0xC1: Read module's configuration)
+    uint8_t e32_read_cmd[] = {E32_CONFIG_READ_CMD, E32_CONFIG_READ_CMD, E32_CONFIG_READ_CMD}; // Command to read configuration
     ESP_LOGI(TAG, "Set programming mode");
     set_mode(MODE_SLEEP_PROG);
     ESP_LOGI(TAG, "Send configuration read command");
     ESP_ERROR_CHECK(e32_send_data(e32_read_cmd, sizeof(e32_read_cmd)));
     vTaskDelay(pdMS_TO_TICKS(WAIT_FOR_PROCESSING_LIB)); // Wait for command to be processed
     wait_for_aux();
-    uint8_t e32_rx_buffer[BUF_SIZE];
-    int e32_rx_len = uart_read_bytes(E32_UART_PORT, e32_rx_buffer, BUF_SIZE, pdMS_TO_TICKS(200));
+    uint8_t e32_rx_buffer[E32_UART_BUF_SIZE];
+    int e32_rx_len = uart_read_bytes(E32_UART_PORT, e32_rx_buffer, E32_UART_BUF_SIZE, pdMS_TO_TICKS(E32_CONFIG_READ_TIMEOUT_MS));
     if (e32_rx_len > 0)
     {
         ESP_LOGI(TAG, "Configuration received (%d bytes):", e32_rx_len);
@@ -306,7 +347,7 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
     uint8_t e32_sped = e32_data[3];
     uint8_t e32_channel = e32_data[4];
     uint8_t e32_option = e32_data[5];
-    e32_channel = e32_channel & 0x1F; // Bit 0-4 are channel number, bit 5-7 is reserved (0x1F: Mask to extract lower 5 bits)
+    e32_channel = e32_channel & E32_CHANNEL_MASK; // Bit 0-4 are channel number, bit 5-7 is reserved
     // Parse SPED byte
     const char *e32_uart_parity_bit[] = {
         "8N1", "8O1", "8E1", "8N1(11)"};
@@ -314,9 +355,9 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
         "1200", "2400", "4800", "9600", "19200", "38400", "57600", "115200"};
     const char *e32_air_rates[] = {
         "0.3 kbps", "1.2 kbps", "2.4 kbps", "4.8 kbps", "9.6 kbps", "19.2 kbps", "Invalid", "Invalid"};
-    uint8_t e32_uart_baud = (e32_sped & 0x38) >> 3; // Mask to get the UART baud rate bits (0x38: Extract bits 3-5)
-    uint8_t e32_air_rate = (e32_sped & 0x7);
-    uint8_t e32_uart_parity = (e32_sped & 0xC0) >> 6; // Mask to get the UART parity bits (0xC0: Extract bits 6-7)
+    uint8_t e32_uart_baud = (e32_sped & E32_UART_BAUD_MASK) >> E32_UART_BAUD_SHIFT; // Extract UART baud rate bits
+    uint8_t e32_air_rate = (e32_sped & E32_AIR_RATE_MASK);                          // Extract air data rate bits
+    uint8_t e32_uart_parity = (e32_sped & E32_UART_PARITY_MASK) >> E32_UART_PARITY_SHIFT; // Extract UART parity bits
     // Parse OPTION byte
     const char *e32_transmission_mode_str[] = {
         "Transparent", "Fixed", "Reserved", "Reserved"};
@@ -324,21 +365,21 @@ void decode_config(uint8_t *e32_data, int e32_data_len)
         "TXD, AUX OpenColOut, RXD OpenColIn", "TXD, AUX PushPullOut, RXD PullUpIn"};
     const char *e32_tx_power_str[] = {
         "30 dBm", "27 dBm", "24 dBm", "21 dBm"};
-    uint8_t e32_transmission_mode = (e32_option & 0x80) >> 7; // Mask to get the transmission mode bits (0x80: Extract highest bit)
-    uint8_t e32_io_mode = (e32_option & 0x40) >> 6;           // Mask to get the I/O mode bits (0x40: Extract bit 6)
-    uint8_t e32_wakeup_time = (e32_option & 0x38) >> 3;       // Mask to get the wakeup time bits (0x38: Extract bits 3-5)
-    uint8_t e32_fec_enabled = (e32_option & 0x4) >> 2;        // Mask to get the FEC enabled bits (0x4: Extract bit 2)
-    uint8_t e32_tx_power = (e32_option & 0x3);                // Mask to get the TX power bits (0x3: Extract bits 0-1)
+    uint8_t e32_transmission_mode = (e32_option & E32_TRANS_MODE_MASK) >> E32_TRANS_MODE_SHIFT; // Extract transmission mode bit
+    uint8_t e32_io_mode = (e32_option & E32_IO_MODE_MASK) >> E32_IO_MODE_SHIFT;                 // Extract I/O mode bit
+    uint8_t e32_wakeup_time = (e32_option & E32_WAKEUP_TIME_MASK) >> E32_WAKEUP_TIME_SHIFT;     // Extract wakeup time bits
+    uint8_t e32_fec_enabled = (e32_option & E32_FEC_MASK) >> E32_FEC_SHIFT;                     // Extract FEC enabled bit
+    uint8_t e32_tx_power = (e32_option & E32_TX_POWER_MASK);                                    // Extract TX power bits
     printf("E32 Module Configuration:\n");
     printf("Header: 0x%02X\n", e32_header);
     printf("Address: 0x%04X\n", e32_address);
     printf("UART Parity: %s \n", e32_uart_parity < 4 ? e32_uart_parity_bit[e32_uart_parity] : "Unknown");
     printf("UART Baud Rate: %s bps\n", e32_uart_baud < 8 ? e32_uart_baudrates[e32_uart_baud] : "Unknown");
     printf("Air Data Rate: %s\n", e32_air_rate < 6 ? e32_air_rates[e32_air_rate] : "Unknown");
-    printf("Channel: %d (%.1f MHz)\n", e32_channel, 862.0 + e32_channel);
+    printf("Channel: %d (%.1f MHz)\n", e32_channel, E32_BASE_FREQUENCY + e32_channel);
     printf("Transmission Mode: %s\n", e32_transmission_mode_str[e32_transmission_mode]);
     printf("I/O Mode: %s\n", e32_io_mode_str[e32_io_mode]);
-    printf("Wakeup Time: %d ms\n", (e32_wakeup_time + 1) * 250); // Wakeup time in ms
+    printf("Wakeup Time: %d ms\n", (e32_wakeup_time + 1) * E32_WAKEUP_TIME_MULTIPLIER); // Wakeup time in ms
     printf("FEC Enabled: %s\n", e32_fec_enabled ? "Yes" : "No");
     printf("TX Power: %s\n", e32_tx_power_str[e32_tx_power]);
 }

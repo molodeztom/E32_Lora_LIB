@@ -21,13 +21,16 @@
   #pragma once
 
   
-  #define WAIT_FOR_PROCESSING_LIB 200 // ms This is the time required for the module to process commands.
+// Time constants
+#define WAIT_FOR_PROCESSING_LIB 200 // ms This is the time required for the module to process commands.
+
 // UART configuration
 #define E32_UART_PORT UART_NUM_1
-#define BUF_SIZE 1024
+#define E32_UART_BUF_SIZE 1024      // UART buffer size
 
-#define CONFIG_CMD_LEN 6
-#define RESPONSE_LEN 6
+// Command and response constants
+#define CONFIG_CMD_LEN 6            // Length of configuration command
+#define RESPONSE_LEN 6              // Length of response
 
   // e32 working modes
   enum MODE
