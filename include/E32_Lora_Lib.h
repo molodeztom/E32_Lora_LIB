@@ -174,11 +174,10 @@ typedef void (*e32_delay_callback_t)(uint32_t ms);
  * @param delay_callback Function to call for implementing delays
  * @return esp_err_t ESP_OK if successful, ESP_ERR_TIMEOUT if no complete message received
  */
-esp_err_t e32_receive_message_with_terminator(
+esp_err_t e32_receive_message(
     uint8_t *buffer,
     size_t buffer_size,
     size_t *message_len,
-    uint8_t terminator,
     uint32_t timeout_ms,
     uint32_t poll_interval_ms,
     e32_delay_callback_t delay_callback
