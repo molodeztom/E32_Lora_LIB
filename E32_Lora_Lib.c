@@ -20,7 +20,7 @@
    20250802: V0.5: add receive message with terminator function
    20250803: V0.6: add automatic version number handling
    20250803: V0.7: optimize debug output, remove unnecessary debug output
-   20250804: V0.8: Test receive a struct with checksum, not using terminator because we have a fixed size message
+   20250804: V0.8: Test receive a struct with checksum, not using terminator because we have a fixed size message 
 
    */
 
@@ -203,7 +203,6 @@ esp_err_t e32_receive_data(uint8_t *buffer, size_t buffer_len, size_t *received_
         // ESP_LOGW(TAG, "No data received (timeout)"); // Silenced to avoid log spam during polling
         return ESP_ERR_TIMEOUT;
     }
-    // Filter using magic bytes or legacy filter
     int filtered_len = filter_message_magic_bytes(buffer, len);
     if (filtered_len == 0) {
         *received_len = 0;
