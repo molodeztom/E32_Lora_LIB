@@ -25,12 +25,17 @@
    */
 
 #include <stdio.h>
+ #include <stdlib.h>
+#include <string.h>
 #include <inttypes.h>
 #include "freertos/FreeRTOS.h"
 #include "E32_Lora_Lib.h"
 #include "driver/gpio.h"
 #include "driver/uart.h"
 #include "esp_log.h"
+
+// Explicit declaration of memcpy to resolve the implicit declaration error
+extern void *memcpy(void *dest, const void *src, size_t n);
 
 static const char *TAG = "LORA_LIB";
 
@@ -395,6 +400,36 @@ const char* e32_lora_lib_get_version(void) {
 #endif
 }
 
+esp_err_t e32_send_message_with_delimiter(const uint8_t *data, size_t len)
+{
+    if (data == NULL) {
+        ESP_LOGE(TAG, "Null pointer argument in e32_send_message_with_delimiter");
+        return ESP_ERR_INVALID_ARG;
+    }
+    
+    // Create a buffer with space for the data and delimiter
+    uint8_t *buffer = malloc(len + 2);
+    if (buffer == NULL) {
+        ESP_LOGE(TAG, "Failed to allocate memory for message buffer");
+        return ESP_ERR_NO_MEM;
+    }
+    
+    // Copy the data manually instead of using memcpy
+    for (size_t i = 0; i < len; i++) {
+        buffer[i] = data[i];
+    }
+    buffer[len] = E32_MSG_DELIMITER_1;
+    buffer[len + 1] = E32_MSG_DELIMITER_2;
+    
+    // Send the data with delimiter
+    esp_err_t err = e32_send_data(buffer, len + 2);
+    
+    // Free the buffer
+    free(buffer);
+    
+    return err;
+}
+
 esp_err_t e32_receive_message(
     uint8_t *buffer,
     size_t buffer_size,
@@ -408,41 +443,96 @@ esp_err_t e32_receive_message(
         return ESP_ERR_INVALID_ARG;
     }
     
-    if (buffer_size == 0) {
-        ESP_LOGE(TAG, "Buffer size cannot be zero");
+    if (buffer_size < 3) { // Need space for at least 1 byte + delimiter
+        ESP_LOGE(TAG, "Buffer size too small");
         return ESP_ERR_INVALID_ARG;
     }
     
     size_t total_received = 0;
     uint32_t waited_ms = 0;
     esp_err_t err = ESP_OK;
+    uint32_t adaptive_interval = E32_MIN_ADAPTIVE_POLL_MS; // Start with a short polling interval
+    bool delimiter_found = false;
     
-    // Initial delay before starting to receive
-    delay_callback(poll_interval_ms);
+    ESP_LOGD(TAG, "Waiting for message with delimiter up to %u ms...", (unsigned)timeout_ms);
     
-    ESP_LOGD(TAG, "Waiting for reply up to %" PRIu32 " ms...", timeout_ms);
-    
-    while (waited_ms < timeout_ms && total_received < buffer_size) {
+    // Check if data is already available before polling
+    if (e32_data_available()) {
         size_t received = 0;
-        err = e32_receive_data(buffer + total_received, buffer_size - total_received, &received);
-        
+        err = e32_receive_data(buffer, buffer_size, &received);
         if (err == ESP_OK && received > 0) {
-            total_received += received;
-        }
-        
-        if (total_received < buffer_size) {
-            delay_callback(poll_interval_ms);
-            waited_ms += poll_interval_ms;
+            total_received = received;
+            
+            // Check for delimiter in received data
+            for (size_t i = 0; i < total_received - 1; i++) {
+                if (buffer[i] == E32_MSG_DELIMITER_1 && buffer[i+1] == E32_MSG_DELIMITER_2) {
+                    delimiter_found = true;
+                    *message_len = i; // Don't include delimiter in message length
+                    ESP_LOGD(TAG, "Delimiter found at position %u", (unsigned)i);
+                    break;
+                }
+            }
         }
     }
     
-    *message_len = total_received;
+    // Main reception loop - continue until delimiter found, timeout, or buffer full
+    while (!delimiter_found && waited_ms < timeout_ms && total_received < buffer_size - 2) {
+        // Only try to receive if data is available
+        if (e32_data_available()) {
+            size_t received = 0;
+            err = e32_receive_data(
+                buffer + total_received,
+                buffer_size - total_received,
+                &received
+            );
+            
+            if (err == ESP_OK && received > 0) {
+                // Check for delimiter in new data (including overlap with previous data)
+                size_t start_check = (total_received > 0) ? total_received - 1 : 0;
+                total_received += received;
+                
+                for (size_t i = start_check; i < total_received - 1; i++) {
+                    if (buffer[i] == E32_MSG_DELIMITER_1 && buffer[i+1] == E32_MSG_DELIMITER_2) {
+                        delimiter_found = true;
+                        *message_len = i; // Don't include delimiter in message length
+                        ESP_LOGD(TAG, "Delimiter found at position %u", (unsigned)i);
+                        break;
+                    }
+                }
+                
+                // Reset polling interval when data is received
+                adaptive_interval = E32_MIN_ADAPTIVE_POLL_MS;
+                
+                // If we received data but no delimiter yet, continue polling immediately
+                continue;
+            }
+        }
+        
+        // No data available or error receiving, wait before next poll
+        ESP_LOGD(TAG, "Adaptive polling interval: %u ms", (unsigned)adaptive_interval);
+        delay_callback(adaptive_interval);
+        waited_ms += adaptive_interval;
+        
+        // Use adaptive polling interval
+        if (adaptive_interval < poll_interval_ms) {
+            adaptive_interval = (adaptive_interval * 3) / 2; // Increase by 50%
+            if (adaptive_interval > poll_interval_ms) {
+                adaptive_interval = poll_interval_ms;
+            }
+        }
+    }
     
-    if (total_received > 0) {
-        ESP_LOGD(TAG, "Received message (%" PRIu32 " bytes)", (uint32_t)total_received);
+    if (delimiter_found) {
+        ESP_LOGD(TAG, "Received complete message with delimiter (%u bytes) in %u ms",
+                 (unsigned)*message_len, (unsigned)waited_ms);
+        return ESP_OK;
+    } else if (total_received > 0) {
+        *message_len = total_received;
+        ESP_LOGW(TAG, "Received partial message without delimiter (%u bytes)", (unsigned)total_received);
         return ESP_OK;
     } else {
-        ESP_LOGD(TAG, "No reply received within timeout");
+        ESP_LOGD(TAG, "No message received within timeout");
+        *message_len = 0;
         return ESP_ERR_TIMEOUT;
     }
 }

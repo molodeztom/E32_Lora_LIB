@@ -32,6 +32,11 @@
 #define CONFIG_CMD_LEN 6            // Length of configuration command
 #define RESPONSE_LEN 6              // Length of response
 
+// Message delimiter constants
+#define E32_MSG_DELIMITER_1 0x0C    // First byte of message delimiter
+#define E32_MSG_DELIMITER_2 0x0C    // Second byte of message delimiter
+#define E32_MIN_ADAPTIVE_POLL_MS 10 // Minimum polling interval in ms
+
   // e32 working modes
   enum MODE
 {
@@ -182,6 +187,18 @@ esp_err_t e32_receive_message(
     uint32_t poll_interval_ms,
     e32_delay_callback_t delay_callback
 );
+
+/**
+ * @brief Send a message with end delimiter
+ *
+ * This function sends data with the end delimiter appended.
+ * It handles memory allocation for the combined buffer.
+ *
+ * @param data Pointer to the data to send
+ * @param len Length of the data
+ * @return esp_err_t ESP_OK if successful, error code otherwise
+ */
+esp_err_t e32_send_message_with_delimiter(const uint8_t *data, size_t len);
 
 // Set pins before calling init
 void e32_init_config(e32_config_t *config);
