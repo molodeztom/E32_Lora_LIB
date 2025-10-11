@@ -21,6 +21,7 @@
    20250803: V0.6: add automatic version number handling
    20250803: V0.7: optimize debug output, remove unnecessary debug output
    20250804: V0.8: Test receive a struct with checksum, not using terminator because we have a fixed size message 
+   20251011: V0.9: Test output to monitor receive message
 
    */
 
@@ -105,7 +106,7 @@ void initLibrary()
 #ifdef E32_APP_VERSION_NUMBER
     ESP_LOGI(TAG, "LoRAESPIDFLib %s", E32_APP_VERSION_NUMBER);
 #else
-    ESP_LOGI(TAG, "LoRAESPIDFLib V0.7");
+    ESP_LOGI(TAG, "LoRAESPIDFLib V0.9");
 #endif
     init_io();
     gpio_get_level(e32_pins.gpio_aux);
@@ -459,6 +460,7 @@ esp_err_t e32_receive_message(
     // Check if data is already available before polling
     if (e32_data_available()) {
         size_t received = 0;
+        ESP_LOGD(TAG, "Data available");
         err = e32_receive_data(buffer, buffer_size, &received);
         if (err == ESP_OK && received > 0) {
             total_received = received;
