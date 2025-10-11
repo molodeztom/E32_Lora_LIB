@@ -32,10 +32,12 @@
 #define CONFIG_CMD_LEN 6            // Length of configuration command
 #define RESPONSE_LEN 6              // Length of response
 
+// Message delimiter constants TODO remove E32_MSG_DELIMITER and add to outside Project
 // Message delimiter constants
-#define E32_MSG_DELIMITER_1 0x0C    // First byte of message delimiter
-#define E32_MSG_DELIMITER_2 0x0C    // Second byte of message delimiter
+#define E32_MSG_DELIMITER 0x0C    // First byte of message delimiter
+//#define E32_MSG_DELIMITER_2 0x0C    // Second byte of message delimiter
 #define E32_MIN_ADAPTIVE_POLL_MS 10 // Minimum polling interval in ms
+
 
   // e32 working modes
   enum MODE

@@ -418,8 +418,8 @@ esp_err_t e32_send_message_with_delimiter(const uint8_t *data, size_t len)
     for (size_t i = 0; i < len; i++) {
         buffer[i] = data[i];
     }
-    buffer[len] = E32_MSG_DELIMITER_1;
-    buffer[len + 1] = E32_MSG_DELIMITER_2;
+    buffer[len] = E32_MSG_DELIMITER;
+    buffer[len + 1] = E32_MSG_DELIMITER;
     
     // Send the data with delimiter
     esp_err_t err = e32_send_data(buffer, len + 2);
@@ -465,7 +465,7 @@ esp_err_t e32_receive_message(
             
             // Check for delimiter in received data
             for (size_t i = 0; i < total_received - 1; i++) {
-                if (buffer[i] == E32_MSG_DELIMITER_1 && buffer[i+1] == E32_MSG_DELIMITER_2) {
+                if (buffer[i] == E32_MSG_DELIMITER && buffer[i+1] == E32_MSG_DELIMITER) {
                     delimiter_found = true;
                     *message_len = i; // Don't include delimiter in message length
                     ESP_LOGD(TAG, "Delimiter found at position %u", (unsigned)i);
@@ -492,7 +492,7 @@ esp_err_t e32_receive_message(
                 total_received += received;
                 
                 for (size_t i = start_check; i < total_received - 1; i++) {
-                    if (buffer[i] == E32_MSG_DELIMITER_1 && buffer[i+1] == E32_MSG_DELIMITER_2) {
+                    if (buffer[i] == E32_MSG_DELIMITER && buffer[i+1] == E32_MSG_DELIMITER) {
                         delimiter_found = true;
                         *message_len = i; // Don't include delimiter in message length
                         ESP_LOGD(TAG, "Delimiter found at position %u", (unsigned)i);
